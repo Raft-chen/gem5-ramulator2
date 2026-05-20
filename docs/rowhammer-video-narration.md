@@ -62,10 +62,34 @@ threshold policy, and issue an RFM or directed RFM request.
 The takeaway is simple. DDR4 victim-row refresh mitigation works in this demo.
 DDR5 equal-frequency comparison is ready, and the RFM plugin is next.
 
+## Result Table Scene
+
+Now let us read the result table carefully, because this is the most important
+part of the demo. Each configuration runs 10,000 alternating reads to create a
+RowHammer style access pattern. The ACT column counts row activations. All
+three runs show 9,999 activations, so the workload is stressing the DRAM rows
+in a comparable way. The PRE column counts precharge commands. Precharge
+appears because alternating rows in the same bank causes row conflicts, so the
+controller has to close one row before it opens the next one. The REFab column
+is normal all-bank refresh. This is the standard refresh mechanism that exists
+even without a RowHammer defense. For DDR4-2400R, we see 2,135 VRR commands.
+For DDR4-3200AA, we see 1,602 VRR commands. VRR means victim-row refresh, so
+both DDR4 configurations triggered the RowHammer mitigation path. The exact
+VRR count is different because the timing preset changes scheduling and
+refresh interaction during the same 10,000-read run. For DDR5-3200BN, we still
+see 9,999 activations, so the hammer pattern is present. But the RFM and
+directed RFM total is zero in this run. That does not mean DDR5 has no
+mitigation concept. It means this pinned Ramulator2 source models DDR5 RFM
+commands and timing, but does not yet include a controller plugin that
+automatically issues RFM based on activation tracking. So the conclusion is:
+DDR4 victim-row refresh mitigation is demonstrated today, and the next
+engineering step is to implement a DDR5 activation tracker that issues RFM or
+directed RFM requests.
+
 ## Transitions
 
-Between each major scene, the generator inserts a short "Hmm" voice cue for
-0.5 seconds, followed by 0.5 seconds of silence before the next frame appears.
+Between each major scene, the generator inserts 1 second of silence before the
+next frame appears.
 
 ## Final Page
 

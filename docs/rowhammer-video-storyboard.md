@@ -145,9 +145,10 @@ docs/rowhammer-video-narration.md
 
 The current version measures each generated narration clip and keeps the
 current visual frame on screen until the narration for that frame is complete.
-Then it inserts a one-second transition before the next frame appears: a short
-"Hmm" voice cue for 0.5 seconds, then 0.5 seconds of silence. The last page
-says "Thank you" and stays on screen for 10 seconds for questions.
+Then it inserts a one-second silent transition before the next frame appears.
+The final version also includes a dedicated result-table explanation page
+before the last page. The last page says "Thank you" and stays on screen for
+10 seconds for questions.
 
 The generator uses a repo-local `ffmpeg` binary if available:
 

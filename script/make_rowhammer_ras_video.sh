@@ -289,6 +289,42 @@ scenes = [
     },
     {
         "id": "10",
+        "min": 60.0,
+        "title": "8. Result table: what the simulation shows",
+        "body": "10,000 alternating reads per configuration.\nSame RowHammer-style access pattern, different DDR model and mitigation path.",
+        "narration": (
+            "Now let us read the result table carefully, because this is the most important part of the demo. "
+            "Each configuration runs 10,000 alternating reads to create a RowHammer style access pattern. "
+            "The ACT column counts row activations. All three runs show 9,999 activations, so the workload is stressing the DRAM rows in a comparable way. "
+            "The PRE column counts precharge commands. Precharge appears because alternating rows in the same bank causes row conflicts, so the controller has to close one row before it opens the next one. "
+            "The REFab column is normal all-bank refresh. This is the standard refresh mechanism that exists even without a RowHammer defense. "
+            "For DDR4-2400R, we see 2,135 VRR commands. For DDR4-3200AA, we see 1,602 VRR commands. "
+            "VRR means victim-row refresh, so both DDR4 configurations triggered the RowHammer mitigation path. "
+            "The exact VRR count is different because the timing preset changes scheduling and refresh interaction during the same 10,000-read run. "
+            "For DDR5-3200BN, we still see 9,999 activations, so the hammer pattern is present. "
+            "But the RFM and directed RFM total is zero in this run. That does not mean DDR5 has no mitigation concept. "
+            "It means this pinned Ramulator2 source models DDR5 RFM commands and timing, but does not yet include a controller plugin that automatically issues RFM based on activation tracking. "
+            "So the conclusion is: DDR4 victim-row refresh mitigation is demonstrated today, and the next engineering step is to implement a DDR5 activation tracker that issues RFM or directed RFM requests."
+        ),
+        "events": [
+            ("Mono", "Config        Reads   ACT   PRE   REFab   VRR   RFM/DRFM   Finding", 100, 255, r"\fs20"),
+            ("Mono", "DDR4-2400R    10000  9999  8952   2134  2135      0      VRR triggered", 100, 295, r"\fs20"),
+            ("Mono", "DDR4-3200AA   10000  9999  9197   1602  1602      0      VRR triggered", 100, 335, r"\fs20"),
+            ("Mono", "DDR5-3200BN   10000  9999  8431   3214     0      0      RFM not issued", 100, 375, r"\fs20"),
+            ("Green", "Key result: DDR4 VRR mitigation is triggered.", 120, 450, r"\fs24"),
+            ("Blue", "DDR5 next step: add ACT tracker -> RFM/DRFM plugin.", 120, 512, r"\fs24"),
+        ],
+        "boxes": [
+            (70, 230, 1140, 205, "white", "fill"),
+            (70, 230, 1140, 205, "0xcbd5e1", "3"),
+            (90, 432, 700, 55, "0xdcfce7", "fill"),
+            (90, 432, 700, 55, "0x22c55e", "3"),
+            (90, 494, 760, 55, "0xeff6ff", "fill"),
+            (90, 494, 760, 55, "0x3b82f6", "3"),
+        ],
+    },
+    {
+        "id": "11",
         "min": 10.0,
         "title": None,
         "body": None,
@@ -306,7 +342,6 @@ scenes = [
 ]
 
 transition_duration = 1.0
-transition_hmm_duration = 0.5
 
 scene_audio = []
 for scene in scenes:
@@ -458,21 +493,6 @@ def silence_wav(wav, duration):
     )
 
 if tts_bin.exists():
-    hmm_mp3 = audio_dir / "hmm.mp3"
-    run(
-        [
-            tts_bin,
-            "--voice",
-            voice,
-            f"--rate={rate}",
-            "--text",
-            "Hmm.",
-            "--write-media",
-            hmm_mp3,
-        ],
-        stdout=subprocess.DEVNULL,
-    )
-
     concat_file = audio_dir / "concat.txt"
     with concat_file.open("w") as concat:
         for idx, scene in enumerate(scenes):
@@ -481,11 +501,8 @@ if tts_bin.exists():
             concat.write(f"file '{wav}'\n")
 
             if not scene.get("no_transition_after"):
-                hmm_wav = audio_dir / f"hmm_{scene['id']}.wav"
                 silence = audio_dir / f"silence_{scene['id']}.wav"
-                wav_from_mp3(hmm_mp3, hmm_wav, transition_hmm_duration)
-                silence_wav(silence, transition_duration - transition_hmm_duration)
-                concat.write(f"file '{hmm_wav}'\n")
+                silence_wav(silence, transition_duration)
                 concat.write(f"file '{silence}'\n")
 
     narration = audio_dir / "narration.wav"
