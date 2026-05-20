@@ -114,13 +114,72 @@ MemorySystem:
 EOF
 }
 
+make_ddr5_rfm_config() {
+  local output="$1"
+  local config="$2"
+
+  cat > "${config}" <<EOF
+Frontend:
+  impl: LoadStoreTrace
+  clock_ratio: 1
+  path: ${DDR5_TRACE}
+
+MemorySystem:
+  impl: GenericDRAM
+  clock_ratio: 1000
+
+  DRAM:
+    impl: DDR5
+    org:
+      preset: DDR5_8Gb_x8
+      channel: 1
+      rank: 2
+    timing:
+      preset: DDR5_3200BN
+    RFM:
+      BRC: 2
+
+  Controller:
+    impl: Generic
+    Scheduler:
+      impl: FRFCFS
+    RefreshManager:
+      impl: AllBank
+    plugins:
+      - ControllerPlugin:
+          impl: DDR5RFM
+          tRH: 4
+          request: directed-rfm
+          reset_on_refresh: true
+          debug: false
+      - ControllerPlugin:
+          impl: CommandCounter
+          path: ${output}
+          commands_to_count:
+            - ACT
+            - PRE
+            - RD
+            - REFab
+            - REFsb
+            - RFMab
+            - RFMsb
+            - DRFMab
+            - DRFMsb
+
+  AddrMapper:
+    impl: RoBaRaCoCh
+EOF
+}
+
 make_ddr4_config "DDR4_2400R" "${OUT_DIR}/ddr4_2400r_oracle.cmds" "${OUT_DIR}/ddr4_2400r.yaml"
 make_ddr4_config "DDR4_3200AA" "${OUT_DIR}/ddr4_3200aa_oracle.cmds" "${OUT_DIR}/ddr4_3200aa.yaml"
 make_ddr5_config "${OUT_DIR}/ddr5_3200bn.cmds" "${OUT_DIR}/ddr5_3200bn.yaml"
+make_ddr5_rfm_config "${OUT_DIR}/ddr5_3200bn_rfm.cmds" "${OUT_DIR}/ddr5_3200bn_rfm.yaml"
 
 "${RAMULATOR}" -f "${OUT_DIR}/ddr4_2400r.yaml" > "${OUT_DIR}/ddr4_2400r.log"
 "${RAMULATOR}" -f "${OUT_DIR}/ddr4_3200aa.yaml" > "${OUT_DIR}/ddr4_3200aa.log"
 "${RAMULATOR}" -f "${OUT_DIR}/ddr5_3200bn.yaml" > "${OUT_DIR}/ddr5_3200bn.log"
+"${RAMULATOR}" -f "${OUT_DIR}/ddr5_3200bn_rfm.yaml" > "${OUT_DIR}/ddr5_3200bn_rfm.log"
 
 python3 - <<PY
 from pathlib import Path
@@ -130,6 +189,7 @@ runs = [
     ("DDR4-2400R", "DDR4-VRR", "OracleRH tRH=4", out / "ddr4_2400r_oracle.cmds", out / "ddr4_2400r.log"),
     ("DDR4-3200AA", "DDR4-VRR", "OracleRH tRH=4", out / "ddr4_3200aa_oracle.cmds", out / "ddr4_3200aa.log"),
     ("DDR5-3200BN", "DDR5", "Command count only", out / "ddr5_3200bn.cmds", out / "ddr5_3200bn.log"),
+    ("DDR5-3200BN-RFM", "DDR5", "DDR5RFM tRH=4 directed-rfm", out / "ddr5_3200bn_rfm.cmds", out / "ddr5_3200bn_rfm.log"),
 ]
 
 def parse_counts(path):
@@ -158,7 +218,7 @@ for name, dram, mitigation, cmd_path, log_path in runs:
     cycles = parse_cycles(log_path)
     rfm_total = sum(counts.get(cmd, 0) for cmd in ["RFMab", "RFMsb", "DRFMab", "DRFMsb"])
     vrr = counts.get("VRR", 0)
-    finding = "VRR triggered" if vrr else ("RFM/DRFM not issued" if "DDR5" in name else "No VRR")
+    finding = "VRR triggered" if vrr else ("RFM/DRFM issued" if rfm_total else ("RFM/DRFM not issued" if "DDR5" in name else "No VRR"))
     rows.append([
         name,
         dram,

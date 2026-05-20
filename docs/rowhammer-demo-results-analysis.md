@@ -100,6 +100,19 @@ mitigation path was triggered.
    not currently model charge leakage, actual data corruption, or DDR5 on-die
    ECC correction behavior.
 
+## DDR5RFM Plugin Extension
+
+After adding the `DDR5RFM` plugin, the 10,000-read comparison includes a DDR5
+mitigation row:
+
+| Config | DRAM model | Mitigation model | Reads | ACT | PRE | REFab | VRR | RFM/DRFM | Cycles | Finding |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| DDR5-3200BN-RFM | DDR5 | DDR5RFM tRH=4 directed-rfm | 10000 | 9999 | 8431 | 3214 | 0 | 357 | 9999000 | RFM/DRFM issued |
+
+This confirms that the simulator can now demonstrate a DDR5 command-level
+RowHammer mitigation path. The default plugin configuration issues
+`directed-rfm`, which maps to the DDR5 `DRFMab` command.
+
 ## Address Mapping Note
 
 The DDR4 and DDR5 traces use different second addresses so both traces hammer

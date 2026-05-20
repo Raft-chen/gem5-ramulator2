@@ -1,0 +1,127 @@
+diff --git a/src/dram_controller/impl/plugin/ddr5_rfm.cpp b/src/dram_controller/impl/plugin/ddr5_rfm.cpp
+new file mode 100644
+index 0000000..cb67ba1
+--- /dev/null
++++ b/src/dram_controller/impl/plugin/ddr5_rfm.cpp
+@@ -0,0 +1,121 @@
++#include <vector>
++#include <unordered_map>
++#include <limits>
++#include <iostream>
++
++#include "base/base.h"
++#include "dram_controller/controller.h"
++#include "dram_controller/plugin.h"
++
++namespace Ramulator {
++
++class DDR5RFM : public IControllerPlugin, public Implementation {
++  RAMULATOR_REGISTER_IMPLEMENTATION(IControllerPlugin, DDR5RFM, "DDR5RFM", "DDR5 RowHammer mitigation using RFM/DRFM requests.")
++
++  private:
++    IDRAM* m_dram = nullptr;
++
++    using BankACTCounter = std::unordered_map<Addr_t, int>;
++    std::vector<BankACTCounter> m_table;
++
++    int m_RH_threshold = -1;
++    std::string m_request_name;
++    int m_RFM_req_id = -1;
++
++    int m_rank_level = -1;
++    int m_bank_level = -1;
++    int m_row_level = -1;
++
++    int m_num_ranks = -1;
++    int m_num_banks_per_rank = -1;
++
++    bool m_reset_on_refresh = true;
++    bool m_is_debug = false;
++
++  public:
++    void init() override {
++      m_RH_threshold = param<int>("tRH").required();
++      m_request_name = param<std::string>("request")
++                         .desc("DDR5 mitigation request: rfm, same-bank-rfm, directed-rfm, or same-bank-directed-rfm")
++                         .default_val("directed-rfm");
++      m_reset_on_refresh = param<bool>("reset_on_refresh").default_val(true);
++      m_is_debug = param<bool>("debug").default_val(false);
++    };
++
++    void setup(IFrontEnd* frontend, IMemorySystem* memory_system) override {
++      m_ctrl = cast_parent<IDRAMController>();
++      m_dram = m_ctrl->m_dram;
++
++      if (!m_dram->m_requests.contains(m_request_name)) {
++        throw ConfigurationError("DDR5RFM request {} is not supported by DRAM implementation {}!", m_request_name, m_dram->get_name());
++      }
++
++      m_RFM_req_id = m_dram->m_requests(m_request_name);
++
++      m_rank_level = m_dram->m_levels("rank");
++      m_bank_level = m_dram->m_levels("bank");
++      m_row_level = m_dram->m_levels("row");
++
++      m_num_ranks = m_dram->get_level_size("rank");
++      m_num_banks_per_rank = m_dram->get_level_size("bankgroup") == -1 ?
++                             m_dram->get_level_size("bank") :
++                             m_dram->get_level_size("bankgroup") * m_dram->get_level_size("bank");
++
++      m_table.resize(m_num_banks_per_rank * m_num_ranks);
++    };
++
++    void update(bool request_found, ReqBuffer::iterator& req_it) override {
++      if (!request_found) {
++        return;
++      }
++
++      if (
++        m_dram->m_command_meta(req_it->command).is_opening &&
++        m_dram->m_command_scopes(req_it->command) == m_row_level
++      ) {
++        int flat_bank_id = req_it->addr_vec[m_bank_level];
++        int accumulated_dimension = 1;
++        for (int i = m_bank_level - 1; i >= m_rank_level; i--) {
++          accumulated_dimension *= m_dram->m_organization.count[i + 1];
++          flat_bank_id += req_it->addr_vec[i] * accumulated_dimension;
++        }
++
++        int row_id = req_it->addr_vec[m_row_level];
++        int& act_count = m_table[flat_bank_id][row_id];
++        act_count++;
++
++        if (m_is_debug) {
++          std::cout << "DDR5RFM: ACT row " << row_id
++                    << " bank " << flat_bank_id
++                    << " count " << act_count
++                    << " threshold " << m_RH_threshold
++                    << std::endl;
++        }
++
++        if (act_count >= m_RH_threshold) {
++          Request rfm_req(req_it->addr_vec, m_RFM_req_id);
++          bool sent = m_ctrl->priority_send(rfm_req);
++          if (sent) {
++            act_count = 0;
++            if (m_is_debug) {
++              std::cout << "DDR5RFM: issued " << m_request_name
++                        << " for row " << row_id
++                        << " bank " << flat_bank_id
++                        << std::endl;
++            }
++          }
++        }
++      } else if (
++        m_reset_on_refresh &&
++        m_dram->m_command_meta(req_it->command).is_refreshing &&
++        m_dram->m_command_scopes(req_it->command) == m_rank_level
++      ) {
++        int rank_id = req_it->addr_vec[m_rank_level];
++        for (int i = rank_id * m_num_banks_per_rank; i < (rank_id + 1) * m_num_banks_per_rank; i++) {
++          m_table[i].clear();
++        }
++      }
++    };
++};
++
++}       // namespace Ramulator
