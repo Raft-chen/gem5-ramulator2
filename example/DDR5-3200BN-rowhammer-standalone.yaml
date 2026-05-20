@@ -1,0 +1,43 @@
+Frontend:
+  impl: LoadStoreTrace
+  clock_ratio: 1
+  path: example/hammer_ls_ddr5.trace
+
+MemorySystem:
+  impl: GenericDRAM
+  clock_ratio: 1000
+
+  DRAM:
+    impl: DDR5
+    org:
+      preset: DDR5_8Gb_x8
+      channel: 1
+      rank: 2
+    timing:
+      preset: DDR5_3200BN
+    RFM:
+      BRC: 2
+
+  Controller:
+    impl: Generic
+    Scheduler:
+      impl: FRFCFS
+    RefreshManager:
+      impl: AllBank
+    plugins:
+      - ControllerPlugin:
+          impl: CommandCounter
+          path: ramulator_out/ddr5_3200bn.cmds
+          commands_to_count:
+            - ACT
+            - PRE
+            - RD
+            - REFab
+            - REFsb
+            - RFMab
+            - RFMsb
+            - DRFMab
+            - DRFMsb
+
+  AddrMapper:
+    impl: RoBaRaCoCh

@@ -1,0 +1,41 @@
+Frontend:
+  impl: LoadStoreTrace
+  clock_ratio: 1
+  path: example/hammer_ls.trace
+
+MemorySystem:
+  impl: GenericDRAM
+  clock_ratio: 1000
+
+  DRAM:
+    impl: DDR4-VRR
+    org:
+      preset: DDR4_2Gb_x8
+      channel: 1
+      rank: 2
+    timing:
+      preset: DDR4_3200AA
+
+  Controller:
+    impl: Generic
+    Scheduler:
+      impl: FRFCFS
+    RefreshManager:
+      impl: AllBank
+    plugins:
+      - ControllerPlugin:
+          impl: OracleRH
+          tRH: 4
+          debug: false
+      - ControllerPlugin:
+          impl: CommandCounter
+          path: ramulator_out/ddr4_3200aa_oracle.cmds
+          commands_to_count:
+            - ACT
+            - PRE
+            - RD
+            - REFab
+            - VRR
+
+  AddrMapper:
+    impl: RoBaRaCoCh

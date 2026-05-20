@@ -190,3 +190,67 @@ Expected trend:
 - Timing changes should affect cycle counts and scheduling, especially
   `memory_system_cycles`, not the basic fact that mitigation triggers when the
   activation threshold is crossed.
+
+## DDR4-3200AA vs DDR5-3200BN Result
+
+Run commands:
+
+```bash
+gem5/ext/ramulator2/ramulator2/ramulator2 \
+  -f example/DDR4-3200AA-rowhammer-standalone.yaml
+
+gem5/ext/ramulator2/ramulator2/ramulator2 \
+  -f example/DDR5-3200BN-rowhammer-standalone.yaml
+```
+
+DDR4-3200AA command-counter output:
+
+```text
+VRR, 2
+REFab, 0
+RD, 11
+PRE, 10
+ACT, 11
+```
+
+DDR5-3200BN command-counter output:
+
+```text
+PREA, 1
+DRFMab, 0
+RFMsb, 0
+RFMab, 0
+REFsb, 0
+REFab, 2
+RD, 11
+PRE, 9
+DRFMsb, 0
+ACT, 11
+```
+
+Both runs use 3200 MT/s timing presets and the same number of read requests.
+Both traces now alternate rows within the same rank/bank, producing 11 observed
+`ACT` commands and 11 observed `RD` commands in this short run.
+
+Interpretation:
+
+- DDR4-3200AA with `DDR4-VRR` plus `OracleRH` triggers mitigation:
+  `VRR, 2`.
+- DDR5-3200BN exposes RFM and DRFM command types in the model, but no included
+  plugin automatically issues them in this config, so all RFM/DRFM counters are
+  zero.
+- The DDR5 run still shows normal refresh behavior: `REFab, 2` and `PREA, 1`.
+- The DDR4 and DDR5 traces need different physical addresses because the DDR5
+  organization and `rank: 2` setting place the row bit at a different address
+  position. For this setup, DDR4 uses `0x40000` as the second address and DDR5
+  uses `0x20000`.
+
+New finding:
+
+The built-in DDR5 model supports DDR5-3200 timing and RFM/DRFM command timing,
+which is useful for an equal-frequency DDR4-vs-DDR5 command-level comparison.
+However, the pinned RowHammer mitigation plugins target `VRR`, not DDR5 RFM.
+To demonstrate DDR5 RFM-based mitigation, a new controller plugin should be
+added that tracks activations and issues `rfm`, `same-bank-rfm`,
+`directed-rfm`, or `same-bank-directed-rfm` requests when a threshold is
+crossed.

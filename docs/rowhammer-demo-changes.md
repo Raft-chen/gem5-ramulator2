@@ -226,6 +226,66 @@ DRAM:
     preset: DDR4_3200AA
 ```
 
+Two standalone 3200 MT/s comparison configs were added:
+
+```text
+example/DDR4-3200AA-rowhammer-standalone.yaml
+example/DDR5-3200BN-rowhammer-standalone.yaml
+```
+
+DDR4-3200AA uses `DDR4-VRR` plus `OracleRH`:
+
+```yaml
+DRAM:
+  impl: DDR4-VRR
+  org:
+    preset: DDR4_2Gb_x8
+    channel: 1
+    rank: 2
+  timing:
+    preset: DDR4_3200AA
+Controller:
+  plugins:
+    - ControllerPlugin:
+        impl: OracleRH
+        tRH: 4
+```
+
+DDR5-3200BN uses the built-in DDR5 timing model:
+
+```yaml
+DRAM:
+  impl: DDR5
+  org:
+    preset: DDR5_8Gb_x8
+    channel: 1
+    rank: 2
+  timing:
+    preset: DDR5_3200BN
+  RFM:
+    BRC: 2
+```
+
+The DDR5 model requires the `RFM` parameter group because it computes RFM and
+directed-RFM timings during DRAM setup.
+
+The DDR5 trace uses a different second address:
+
+```text
+example/hammer_ls_ddr5.trace
+```
+
+```text
+LD 0x0
+LD 0x20000
+...
+```
+
+With `rank: 2`, the DDR5 address mapper consumes an additional rank bit before
+bankgroup/bank/row bits. `0x20000` is therefore the row stride needed to keep
+the same rank/bank and alternate rows. Using `0x10000` changes the bank instead
+of the row.
+
 DDR5 support is present, but this pinned Ramulator2 source only includes DDR5
 3200 timing presets:
 
@@ -249,3 +309,19 @@ A true DDR5 4800 MT/s demo needs either:
 
 Do not label a DDR5 run as 4800 MT/s if it is only using the built-in
 `DDR5_3200*` preset.
+
+For an apples-to-apples frequency comparison, use:
+
+```bash
+gem5/ext/ramulator2/ramulator2/ramulator2 \
+  -f example/DDR4-3200AA-rowhammer-standalone.yaml
+
+gem5/ext/ramulator2/ramulator2/ramulator2 \
+  -f example/DDR5-3200BN-rowhammer-standalone.yaml
+```
+
+Important limitation: this source tree has DDR5 RFM/DRFM commands and timing,
+but the included RowHammer mitigation plugins are DDR4-VRR oriented and do not
+automatically issue DDR5 RFM commands. Also, no explicit on-die ECC model was
+found in the pinned Ramulator2 source. Treat this as a DDR4-vs-DDR5 command and
+timing comparison, not as a full DDR5 on-die ECC reliability model.
