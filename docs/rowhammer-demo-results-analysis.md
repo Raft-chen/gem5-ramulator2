@@ -155,7 +155,18 @@ The final video should show the problem and mitigation evolution in this order:
    command-level RFM availability, but not an on-die ECC fault-correction
    model.
 
-`ffmpeg` is not installed in this environment, so this commit provides static
-SVG frames and a clear storyboard. The next step is to generate additional
-frames or an HTML animation, then encode it to MP4 in an environment with
-`ffmpeg`.
+A first MP4 demo video is available here:
+
+```text
+docs/videos/rowhammer_ras_demo.mp4
+```
+
+Regenerate it with:
+
+```bash
+bash script/make_rowhammer_ras_video.sh
+```
+
+The video is intentionally concise and uses static vector-style scenes. The
+next quality step is adding animation for command flow, activation counters,
+and refresh-window timing.

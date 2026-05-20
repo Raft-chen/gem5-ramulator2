@@ -1,2 +1,5 @@
 gem5/
 ramulator2
+.codex/
+.tools/
+ramulator_out/

@@ -124,9 +124,26 @@ activations and issues `rfm`, `same-bank-rfm`, `directed-rfm`, or
 
 ## Production Note
 
-`ffmpeg` is not installed in the current environment. The current repository
-therefore provides static SVG frames and this storyboard. To produce MP4, use a
-machine with `ffmpeg` and either:
+A first generated MP4 is available at:
 
-- render the SVG frames into stills with narration, or
-- build a short HTML/SVG animation and screen-record or encode it.
+```text
+docs/videos/rowhammer_ras_demo.mp4
+```
+
+Regenerate it with:
+
+```bash
+bash script/make_rowhammer_ras_video.sh
+```
+
+The generator uses a repo-local `ffmpeg` binary if available:
+
+```text
+.tools/ffmpeg/ffmpeg
+```
+
+or any compatible binary passed through:
+
+```bash
+FFMPEG=/path/to/ffmpeg bash script/make_rowhammer_ras_video.sh
+```
