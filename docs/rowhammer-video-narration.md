@@ -2,11 +2,20 @@
 
 This is the spoken narration used by `script/make_rowhammer_ras_video.sh`.
 
+The default generated voice is:
+
+```text
+en-US-RogerNeural
+```
+
+That voice is selected to sound younger and more energetic than the earlier
+`en-US-GuyNeural` voice.
+
 ## Scene 1
 
-RowHammer is a DRAM reliability and serviceability problem. Repeated row
-activation can disturb nearby rows, creating a risk of silent data corruption
-before normal refresh restores charge.
+RowHammer is a DRAM reliability problem. Repeated row activation can disturb
+nearby rows, creating a risk of silent data corruption before normal refresh
+restores charge.
 
 ## Scene 2
 
@@ -28,17 +37,27 @@ normal write.
 
 ## Scene 5
 
-In this demo, DDR4 uses the DDR4-VRR model with OracleRH. When the activation
+In this demo, DDR4 uses the DDR4 VRR model with Oracle RH. When the activation
 threshold is crossed, the controller injects victim-row refresh commands.
 
 ## Scene 6
 
-For DDR5 at 3200 mega transfers per second, Ramulator2 exposes RFM and DRFM
-timing. This source tree still needs a DDR5 plugin that turns activation
-tracking into RFM requests.
+For DDR5 at 3200 mega transfers per second, Ramulator2 exposes RFM and
+directed RFM timing. This source tree still needs a DDR5 plugin that turns
+activation tracking into RFM requests.
 
 ## Scene 7
 
-The takeaway is simple. RowHammer is a command-rate and refresh-window RAS
-problem. The DDR4 mitigation demo works today. The next step is DDR5 RFM
-mitigation.
+The DDR4 test performs 10,000 alternating reads. When the victim-row risk is
+detected, the demo records the event, issues victim-row refresh, and reports
+the result.
+
+## Scene 8
+
+The DDR5 next step is clear. Track activations per bank and row, apply a
+threshold policy, and issue an RFM or directed RFM request.
+
+## Scene 9
+
+The takeaway is simple. DDR4 victim-row refresh mitigation works in this demo.
+DDR5 equal-frequency comparison is ready, and the RFM plugin is next.
