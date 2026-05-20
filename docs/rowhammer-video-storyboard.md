@@ -136,6 +136,13 @@ Regenerate it with:
 bash script/make_rowhammer_ras_video.sh
 ```
 
+The generated MP4 includes a natural-language narration track when
+`edge-tts` is available. The narration source text is stored in:
+
+```text
+docs/rowhammer-video-narration.md
+```
+
 The generator uses a repo-local `ffmpeg` binary if available:
 
 ```text

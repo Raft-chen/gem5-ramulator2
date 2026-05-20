@@ -6,6 +6,7 @@ FFMPEG="${FFMPEG:-${ROOT_DIR}/.tools/ffmpeg/ffmpeg}"
 OUT_DIR="${ROOT_DIR}/docs/videos"
 WORK_DIR="${ROOT_DIR}/ramulator_out/video_work"
 OUT_MP4="${OUT_DIR}/rowhammer_ras_demo.mp4"
+SILENT_MP4="${WORK_DIR}/rowhammer_ras_demo_silent.mp4"
 
 if [[ ! -x "${FFMPEG}" ]]; then
   echo "ffmpeg not found at ${FFMPEG}" >&2
@@ -153,6 +154,49 @@ EOF
   -map "[v]" \
   -c:v libx264 -preset veryfast -crf 20 -pix_fmt yuv420p \
   -movflags +faststart \
-  "${OUT_MP4}"
+  "${SILENT_MP4}"
 
-echo "Generated ${OUT_MP4}"
+TTS_BIN="${TTS_BIN:-${ROOT_DIR}/.tools/tts-venv/bin/edge-tts}"
+VOICE="${VOICE:-en-US-GuyNeural}"
+RATE="${RATE:-+8%}"
+
+if [[ -x "${TTS_BIN}" ]]; then
+  AUDIO_DIR="${WORK_DIR}/audio"
+  mkdir -p "${AUDIO_DIR}"
+  rm -f "${AUDIO_DIR}/"*
+
+  make_tts_segment() {
+    local idx="$1"
+    local duration="$2"
+    local text="$3"
+    local txt="${AUDIO_DIR}/scene_${idx}.txt"
+    local mp3="${AUDIO_DIR}/scene_${idx}.mp3"
+    local wav="${AUDIO_DIR}/scene_${idx}.wav"
+
+    printf "%s" "${text}" > "${txt}"
+    "${TTS_BIN}" --voice "${VOICE}" --rate="${RATE}" --text "$(cat "${txt}")" --write-media "${mp3}" >/dev/null
+    "${FFMPEG}" -y -i "${mp3}" \
+      -af "apad,atrim=0:${duration},asetpts=N/SR/TB" \
+      -ar 48000 -ac 2 -c:a pcm_s16le "${wav}" >/dev/null 2>&1
+    printf "file '%s'\n" "${wav}" >> "${AUDIO_DIR}/concat.txt"
+  }
+
+  rm -f "${AUDIO_DIR}/concat.txt"
+  make_tts_segment 01 7 "RowHammer is a DRAM reliability and serviceability problem. Repeated row activation can disturb nearby rows, creating a risk of silent data corruption before normal refresh restores charge."
+  make_tts_segment 02 8 "In normal DDR operation, rows are activated, read, restored, and closed. Periodic refresh keeps cell charge within a healthy margin, so data remains stable."
+  make_tts_segment 03 8 "The RowHammer access pattern repeatedly opens aggressor rows in the same bank. That creates many activate, read, and precharge commands inside one refresh window."
+  make_tts_segment 04 8 "If the victim row loses enough charge before refresh or mitigation, a stored bit can flip. This is why RowHammer matters for RAS: data changes without a normal write."
+  make_tts_segment 05 9 "In this demo, DDR4 uses the DDR4 VRR model with Oracle RH. When the activation threshold is crossed, the controller injects victim-row refresh commands."
+  make_tts_segment 06 9 "For DDR5 at 3200 mega transfers per second, Ramulator2 exposes RFM and directed RFM timing. This source tree still needs a DDR5 plugin that turns activation tracking into RFM requests."
+  make_tts_segment 07 8 "The takeaway is simple. RowHammer is a command-rate and refresh-window RAS problem. The DDR4 mitigation demo works today. The next step is DDR5 RFM mitigation."
+
+  "${FFMPEG}" -y -f concat -safe 0 -i "${AUDIO_DIR}/concat.txt" \
+    -c copy "${AUDIO_DIR}/narration.wav" >/dev/null 2>&1
+  "${FFMPEG}" -y -i "${SILENT_MP4}" -i "${AUDIO_DIR}/narration.wav" \
+    -c:v copy -c:a aac -b:a 128k -shortest -movflags +faststart \
+    "${OUT_MP4}" >/dev/null 2>&1
+  echo "Generated ${OUT_MP4} with narration voice ${VOICE}"
+else
+  cp "${SILENT_MP4}" "${OUT_MP4}"
+  echo "Generated ${OUT_MP4} without narration; TTS binary not found at ${TTS_BIN}"
+fi
