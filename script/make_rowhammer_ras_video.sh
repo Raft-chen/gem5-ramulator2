@@ -84,14 +84,14 @@ Dialogue: 0,0:00:31.00,0:00:40.00,Small,,0,0,0,,{\pos(805,378)}Victim-row refres
 Dialogue: 0,0:00:40.00,0:00:49.00,Title,,0,0,0,,{\pos(64,50)}5. DDR5 direction at 3200 MT/s
 Dialogue: 0,0:00:40.00,0:00:49.00,Body,,0,0,0,,{\pos(64,115)}DDR5 model exposes RFM and DRFM command timing.\NThis pinned source does not yet include an automatic DDR5 RFM RowHammer plugin.
 Dialogue: 0,0:00:40.00,0:00:49.00,Title,,0,0,0,,{\fs30\pos(120,260)}DDR5 command-level comparison
-Dialogue: 0,0:00:40.00,0:00:49.00,Blue,,0,0,0,,{\pos(140,325)}DDR5-3200BN  ACT 9999   RFM/DRFM 0\NNext step: ACT tracker -> threshold -> RFM or DRFM request
-Dialogue: 0,0:00:40.00,0:00:49.00,Blue,,0,0,0,,{\pos(805,338)}RFM support exists
-Dialogue: 0,0:00:40.00,0:00:49.00,Small,,0,0,0,,{\pos(805,373)}Plugin still needed
+Dialogue: 0,0:00:40.00,0:00:49.00,Blue,,0,0,0,,{\fs25\pos(140,325)}DDR5-3200BN  ACT 9999   RFM/DRFM 0\NNext: ACT counter -> threshold\NIssue RFM/DRFM request
+Dialogue: 0,0:00:40.00,0:00:49.00,Blue,,0,0,0,,{\fs25\pos(835,386)}RFM support exists
+Dialogue: 0,0:00:40.00,0:00:49.00,Small,,0,0,0,,{\fs19\pos(835,418)}Plugin still needed
 
 Dialogue: 0,0:00:49.00,0:00:57.00,Title,,0,0,0,,{\pos(64,60)}Demo takeaway
-Dialogue: 0,0:00:49.00,0:00:57.00,Body,,0,0,0,,{\pos(64,140)}RowHammer is a command-rate and refresh-window RAS problem.\NDDR4 demo: VRR mitigation triggers.\NDDR5 demo: equal-frequency command comparison is ready; RFM mitigation plugin is the next engineering step.
-Dialogue: 0,0:00:49.00,0:00:57.00,Green,,0,0,0,,{\pos(120,435)}DDR4: VRR demo works
-Dialogue: 0,0:00:49.00,0:00:57.00,Blue,,0,0,0,,{\pos(500,435)}DDR5: add RFM mitigation plugin next
+Dialogue: 0,0:00:49.00,0:00:57.00,Body,,0,0,0,,{\pos(64,140)}RowHammer is a command-rate and refresh-window RAS problem.\NDDR4 demo: VRR mitigation triggers.\NDDR5 demo: equal-frequency command comparison is ready.\NNext engineering step: add an RFM mitigation plugin.
+Dialogue: 0,0:00:49.00,0:00:57.00,Green,,0,0,0,,{\fs25\pos(130,455)}DDR4: VRR demo works
+Dialogue: 0,0:00:49.00,0:00:57.00,Blue,,0,0,0,,{\fs25\pos(530,455)}DDR5: add RFM plugin next
 EOF
 
 cat > "${FILTER_FILE}" <<EOF
@@ -137,12 +137,12 @@ drawbox=x=760:y=310:w=300:h=92:color=0xdcfce7:t=fill:enable='between(t,31,40)',
 drawbox=x=760:y=310:w=300:h=92:color=0x22c55e:t=3:enable='between(t,31,40)',
 drawbox=x=80:y=230:w=1120:h=270:color=white:t=fill:enable='between(t,40,49)',
 drawbox=x=80:y=230:w=1120:h=270:color=0xcbd5e1:t=3:enable='between(t,40,49)',
-drawbox=x=775:y=310:w=310:h=100:color=0xeff6ff:t=fill:enable='between(t,40,49)',
-drawbox=x=775:y=310:w=310:h=100:color=0x3b82f6:t=3:enable='between(t,40,49)',
-drawbox=x=95:y=405:w=330:h=90:color=0xdcfce7:t=fill:enable='between(t,49,57)',
-drawbox=x=95:y=405:w=330:h=90:color=0x22c55e:t=3:enable='between(t,49,57)',
-drawbox=x=475:y=405:w=510:h=90:color=0xeff6ff:t=fill:enable='between(t,49,57)',
-drawbox=x=475:y=405:w=510:h=90:color=0x3b82f6:t=3:enable='between(t,49,57)',
+drawbox=x=805:y=360:w=310:h=100:color=0xeff6ff:t=fill:enable='between(t,40,49)',
+drawbox=x=805:y=360:w=310:h=100:color=0x3b82f6:t=3:enable='between(t,40,49)',
+drawbox=x=95:y=425:w=335:h=75:color=0xdcfce7:t=fill:enable='between(t,49,57)',
+drawbox=x=95:y=425:w=335:h=75:color=0x22c55e:t=3:enable='between(t,49,57)',
+drawbox=x=500:y=425:w=430:h=75:color=0xeff6ff:t=fill:enable='between(t,49,57)',
+drawbox=x=500:y=425:w=430:h=75:color=0x3b82f6:t=3:enable='between(t,49,57)',
 ass=${ASS_FILE},
 format=yuv420p[v]
 EOF
