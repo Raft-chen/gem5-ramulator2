@@ -1,256 +1,161 @@
 # RowHammer Demo Results And Analysis
 
-This note records the observed command-counter result from the standalone
-RowHammer mitigation demo.
+This note summarizes the standalone RowHammer demo results for three
+configurations:
 
-## Run
+- DDR4-2400R
+- DDR4-3200AA
+- DDR5-3200BN
 
-Command:
+Each run uses a 10,000-read hammer trace that alternates between two rows in
+the same rank and bank.
 
-```bash
-gem5/ext/ramulator2/ramulator2/ramulator2 \
-  -f example/DDR4-rowhammer-standalone.yaml
-```
+## One-Command Reproduction
 
-Output summary from Ramulator2:
-
-```text
-Frontend:
-  impl: LoadStoreTrace
-
-MemorySystem:
-  impl: GenericDRAM
-  total_num_other_requests: 0
-  total_num_write_requests: 0
-  total_num_read_requests: 12
-  memory_system_cycles: 11000
-  DRAM:
-    impl: DDR4-VRR
-  AddrMapper:
-    impl: RoBaRaCoCh
-  Controller:
-    impl: Generic
-    id: Channel 0
-    Scheduler:
-      impl: FRFCFS
-    RefreshManager:
-      impl: AllBank
-    ControllerPlugin:
-      impl: OracleRH
-    ControllerPlugin:
-      impl: CommandCounter
-```
-
-Command-counter output:
-
-```text
-PREA, 1
-VRR, 2
-REFab, 2
-RD, 11
-PRE, 9
-ACT, 11
-```
-
-## Result Meaning
-
-The key finding is:
-
-```text
-VRR, 2
-```
-
-This means the configured RowHammer mitigation issued two victim-row-refresh
-commands during the short trace.
-
-Command meanings:
-
-- `ACT`: a DRAM row activation.
-- `PRE`: a precharge that closes an open bank row.
-- `RD`: a read command.
-- `REFab`: normal all-bank refresh.
-- `PREA`: precharge-all, used before refresh-like operations when needed.
-- `VRR`: victim-row refresh, the mitigation response.
-
-The demo trace alternates between two addresses:
-
-```text
-0x0
-0x40000
-```
-
-With the selected DDR4 organization and `RoBaRaCoCh` address mapper, these
-addresses map to different rows in the same bank. Alternating them prevents a
-simple row-buffer-hit stream and produces repeated activation/precharge
-behavior, which is the command-level pattern needed to exercise RowHammer
-defenses.
-
-## Why VRR Was Triggered
-
-The YAML config uses:
-
-```yaml
-impl: OracleRH
-tRH: 4
-```
-
-`OracleRH` tracks activation counts per row. When a row reaches `tRH`, it sends
-a `victim-row-refresh` request. In `DDR4-VRR`, that request maps to the `VRR`
-command.
-
-The observed `ACT, 11` count shows the trace created repeated row activations.
-The observed `VRR, 2` count shows those activations crossed the configured
-threshold twice.
-
-## Parsing Method
-
-Use this parser to turn the command-counter file into an explanation:
+Run:
 
 ```bash
-python3 - <<'PY'
-from pathlib import Path
-
-path = Path("ramulator_out/ddr4_standalone_oracle.cmds")
-counts = {}
-
-for line in path.read_text().splitlines():
-    if not line.strip():
-        continue
-    cmd, count = line.split(",")
-    counts[cmd.strip()] = int(count.strip())
-
-for name in ["ACT", "PRE", "RD", "REFab", "PREA", "VRR"]:
-    print(f"{name:5s}: {counts.get(name, 0)}")
-
-print()
-if counts.get("VRR", 0) > 0:
-    print("Finding: RowHammer mitigation was triggered.")
-    print("Reason : activation count crossed the configured tRH threshold.")
-else:
-    print("Finding: RowHammer mitigation was not triggered.")
-    print("Reason : no row reached the configured tRH threshold, or the run")
-    print("         ended before queued mitigation commands were issued.")
-PY
+bash script/run_rowhammer_compare_10000.sh
 ```
 
-Expected interpretation for the recorded result:
+The script generates temporary traces and configs under:
 
 ```text
-Finding: RowHammer mitigation was triggered.
-Reason : activation count crossed the configured tRH threshold.
+ramulator_out/compare_10000/
 ```
 
-## New Findings
-
-1. The standalone frontend stops when the trace has been injected, not when all
-   memory-controller queues are fully drained. A very small
-   `MemorySystem.clock_ratio` can therefore undercount late commands such as
-   `VRR`. Using `MemorySystem.clock_ratio: 1000` made the short demo produce a
-   visible mitigation result.
-
-2. This is a mitigation-trigger demo, not a bit-flip demo. The current result
-   proves that row activation tracking and victim-row refresh insertion are
-   working. It does not prove a physical fault model or data corruption event.
-
-3. The pinned Ramulator2 version has ready-to-use DDR4 2400 and DDR4 3200
-   presets in `DDR4-VRR`. It does not have a ready-to-use DDR5 4800 preset.
-   DDR5 4800 should be added as a timing-model extension before presenting a
-   DDR5 4800 result.
-
-4. The gem5 integration path is structurally prepared, but this machine still
-   needs Python development headers and `python3-config` before `gem5.opt` can
-   be built.
-
-## Suggested Next Experiments
-
-Run the same trace with different `tRH` values:
-
-```yaml
-tRH: 2
-tRH: 4
-tRH: 8
-tRH: 100
-```
-
-Expected trend:
-
-- Lower `tRH`: more `VRR` commands.
-- Higher `tRH`: fewer or zero `VRR` commands.
-
-Run the same trace with DDR4 speed presets:
-
-```yaml
-preset: DDR4_2400R
-preset: DDR4_3200AA
-```
-
-Expected trend:
-
-- The number of injected `VRR` commands should be primarily threshold-driven.
-- Timing changes should affect cycle counts and scheduling, especially
-  `memory_system_cycles`, not the basic fact that mitigation triggers when the
-  activation threshold is crossed.
-
-## DDR4-3200AA vs DDR5-3200BN Result
-
-Run commands:
-
-```bash
-gem5/ext/ramulator2/ramulator2/ramulator2 \
-  -f example/DDR4-3200AA-rowhammer-standalone.yaml
-
-gem5/ext/ramulator2/ramulator2/ramulator2 \
-  -f example/DDR5-3200BN-rowhammer-standalone.yaml
-```
-
-DDR4-3200AA command-counter output:
+It writes:
 
 ```text
-VRR, 2
-REFab, 0
-RD, 11
-PRE, 10
-ACT, 11
+ramulator_out/compare_10000/summary.csv
+ramulator_out/compare_10000/summary.md
 ```
 
-DDR5-3200BN command-counter output:
+## Result Table
+
+| Config | DRAM model | Mitigation model | Reads | ACT | PRE | REFab | VRR | RFM/DRFM | Cycles | Finding |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| DDR4-2400R | DDR4-VRR | OracleRH tRH=4 | 10000 | 9999 | 8952 | 2134 | 2135 | 0 | 9999000 | VRR triggered |
+| DDR4-3200AA | DDR4-VRR | OracleRH tRH=4 | 10000 | 9999 | 9197 | 1602 | 1602 | 0 | 9999000 | VRR triggered |
+| DDR5-3200BN | DDR5 | Command count only | 10000 | 9999 | 8431 | 3214 | 0 | 0 | 9999000 | RFM/DRFM not issued |
+
+## How To Read The Table
+
+`Reads` is the number of load requests injected by the trace.
+
+`ACT` is the number of row activations. RowHammer is fundamentally about too
+many activations to aggressor rows in a refresh window.
+
+`PRE` is the number of precharge commands. The alternating-row trace causes
+row conflicts, so the controller must close one row before opening another row
+in the same bank.
+
+`REFab` is normal all-bank refresh.
+
+`VRR` is victim-row refresh. In this demo, `VRR > 0` means the DDR4 RowHammer
+mitigation path was triggered.
+
+`RFM/DRFM` is the sum of DDR5 `RFMab`, `RFMsb`, `DRFMab`, and `DRFMsb`.
+
+## Main Findings
+
+1. DDR4-2400R and DDR4-3200AA both trigger RowHammer mitigation.
+
+   The `OracleRH` plugin tracks row activations. When a row reaches `tRH: 4`,
+   it injects a `victim-row-refresh` request. In the `DDR4-VRR` model, that
+   request becomes a `VRR` command.
+
+2. DDR4-2400R issues more `VRR` commands than DDR4-3200AA in this fixed
+   10,000-read run.
+
+   Observed:
+
+   ```text
+   DDR4-2400R  VRR = 2135
+   DDR4-3200AA VRR = 1602
+   ```
+
+   This does not mean DDR4-2400 is universally less safe. It means that under
+   this particular trace, scheduler behavior, timing preset, and fixed
+   simulation window, more mitigation commands were issued in the DDR4-2400R
+   case.
+
+3. DDR5-3200BN shows the same hammer-style command pressure but no automatic
+   RFM mitigation in this source tree.
+
+   Observed:
+
+   ```text
+   DDR5-3200BN ACT = 9999
+   DDR5-3200BN RFM/DRFM = 0
+   ```
+
+   The pinned Ramulator2 DDR5 model includes RFM and DRFM commands and timing,
+   but the included RowHammer mitigation plugins are `VRR`-oriented. They do
+   not automatically issue DDR5 RFM commands.
+
+4. This is a command-level mitigation demo, not a physical bit-flip model.
+
+   The simulator shows activations, refreshes, and mitigation commands. It does
+   not currently model charge leakage, actual data corruption, or DDR5 on-die
+   ECC correction behavior.
+
+## Address Mapping Note
+
+The DDR4 and DDR5 traces use different second addresses so both traces hammer
+two rows in the same rank and bank.
+
+DDR4 trace pattern:
 
 ```text
-PREA, 1
-DRFMab, 0
-RFMsb, 0
-RFMab, 0
-REFsb, 0
-REFab, 2
-RD, 11
-PRE, 9
-DRFMsb, 0
-ACT, 11
+LD 0x0
+LD 0x40000
 ```
 
-Both runs use 3200 MT/s timing presets and the same number of read requests.
-Both traces now alternate rows within the same rank/bank, producing 11 observed
-`ACT` commands and 11 observed `RD` commands in this short run.
+DDR5 trace pattern:
 
-Interpretation:
+```text
+LD 0x0
+LD 0x20000
+```
 
-- DDR4-3200AA with `DDR4-VRR` plus `OracleRH` triggers mitigation:
-  `VRR, 2`.
-- DDR5-3200BN exposes RFM and DRFM command types in the model, but no included
-  plugin automatically issues them in this config, so all RFM/DRFM counters are
-  zero.
-- The DDR5 run still shows normal refresh behavior: `REFab, 2` and `PREA, 1`.
-- The DDR4 and DDR5 traces need different physical addresses because the DDR5
-  organization and `rank: 2` setting place the row bit at a different address
-  position. For this setup, DDR4 uses `0x40000` as the second address and DDR5
-  uses `0x20000`.
+The difference comes from the selected organizations and the `RoBaRaCoCh`
+mapper. With `rank: 2`, the row bit lands at a different address position in
+the DDR5 configuration.
 
-New finding:
+## Visual Explanation
 
-The built-in DDR5 model supports DDR5-3200 timing and RFM/DRFM command timing,
-which is useful for an equal-frequency DDR4-vs-DDR5 command-level comparison.
-However, the pinned RowHammer mitigation plugins target `VRR`, not DDR5 RFM.
-To demonstrate DDR5 RFM-based mitigation, a new controller plugin should be
-added that tracks activations and issues `rfm`, `same-bank-rfm`,
-`directed-rfm`, or `same-bank-directed-rfm` requests when a threshold is
-crossed.
+These three diagrams provide a simple visual story for a demo deck.
+
+Normal DDR state:
+
+![DDR normal state](assets/rowhammer-01-ddr-no-error.svg)
+
+Hammering one or two aggressor rows:
+
+![DDR hammering aggressor rows](assets/rowhammer-02-hammer-reads.svg)
+
+Victim-row bit flip:
+
+![DDR victim row bit flip](assets/rowhammer-03-victim-bitflip.svg)
+
+## Phase 3 Video Direction
+
+The final video should show the problem and mitigation evolution in this order:
+
+1. DRAM rows store charge in cells.
+2. Repeated activation of aggressor rows disturbs nearby victim rows.
+3. In DDR3/DDR4 timing windows, enough activations before refresh can create a
+   bit flip.
+4. DDR4-era mitigations such as TRR-like tracking or victim-row refresh reduce
+   risk by refreshing neighbors.
+5. DDR5 adds standardized refresh-management command support such as RFM and
+   DRFM, and commodity DDR5 devices also commonly include on-die ECC.
+6. This Ramulator2 demo currently shows DDR4 `VRR` mitigation and DDR5
+   command-level RFM availability, but not an on-die ECC fault-correction
+   model.
+
+`ffmpeg` is not installed in this environment, so this commit provides static
+SVG frames and a clear storyboard. The next step is to generate additional
+frames or an HTML animation, then encode it to MP4 in an environment with
+`ffmpeg`.

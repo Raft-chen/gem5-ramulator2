@@ -325,3 +325,31 @@ but the included RowHammer mitigation plugins are DDR4-VRR oriented and do not
 automatically issue DDR5 RFM commands. Also, no explicit on-die ECC model was
 found in the pinned Ramulator2 source. Treat this as a DDR4-vs-DDR5 command and
 timing comparison, not as a full DDR5 on-die ECC reliability model.
+
+## 10,000-Read Comparison Runner
+
+Use this script to reproduce the three-row comparison table:
+
+```bash
+bash script/run_rowhammer_compare_10000.sh
+```
+
+It generates temporary traces and configs under:
+
+```text
+ramulator_out/compare_10000/
+```
+
+The compared configurations are:
+
+- DDR4-2400R with `DDR4-VRR` and `OracleRH`.
+- DDR4-3200AA with `DDR4-VRR` and `OracleRH`.
+- DDR5-3200BN with DDR5 command counters for `RFMab`, `RFMsb`, `DRFMab`, and
+  `DRFMsb`.
+
+The summary files are:
+
+```text
+ramulator_out/compare_10000/summary.csv
+ramulator_out/compare_10000/summary.md
+```
