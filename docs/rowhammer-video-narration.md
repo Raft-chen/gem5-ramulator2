@@ -61,3 +61,12 @@ threshold policy, and issue an RFM or directed RFM request.
 
 The takeaway is simple. DDR4 victim-row refresh mitigation works in this demo.
 DDR5 equal-frequency comparison is ready, and the RFM plugin is next.
+
+## Transitions
+
+Between each major scene, the generator inserts a short "Hmm" voice cue for
+0.5 seconds, followed by 0.5 seconds of silence before the next frame appears.
+
+## Final Page
+
+Thank you. I will pause here for questions.
