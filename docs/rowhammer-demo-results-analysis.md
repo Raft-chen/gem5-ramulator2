@@ -136,6 +136,87 @@ The difference comes from the selected organizations and the `RoBaRaCoCh`
 mapper. With `rank: 2`, the row bit lands at a different address position in
 the DDR5 configuration.
 
+## On-Die ECC Capability (Error-Injection Model)
+
+The command-count demos above show mitigation *commands*, not what happens to
+data once bits actually flip. `script/ecc_capability_test.py` fills that gap
+with a standalone SECDED (single-error-correct, double-error-detect) Hamming
+code model, independent of Ramulator2/gem5. It injects synthetic bit-flip
+patterns into ECC codewords and classifies the outcome as corrected, safely
+detected-uncorrectable, or **silent data corruption (SDC)** — the ECC reports
+success but the data is actually wrong.
+
+Reproduce with 5 independent repeats of 20,000 trials per pattern (100,000
+trials total per row):
+
+```bash
+bash script/run_ecc_capability_test.sh --k 64 128 --trials 20000 --repeats 5 \
+  --burst-widths 1 2 3 4 5 6 8 12 16
+```
+
+`SDC range` below is the min-max SDC rate across the 5 repeats, showing the
+result is stable rather than seed noise.
+
+### RowHammer-style clustered burst errors (k=64, codeword=72 bits)
+
+| Burst width | corrected_ok | detected_due | SDC total | SDC range |
+| --- | --- | --- | --- | --- |
+| 1 | 1.0000 | 0.0000 | 0.0000 | 0.0000-0.0000 |
+| 2 | 0.0000 | 1.0000 | 0.0000 | 0.0000-0.0000 |
+| 3 | 0.0000 | 0.0000 | 1.0000 | 1.0000-1.0000 |
+| 4 | 0.0000 | 0.4929 | 0.5071 | 0.5010-0.5091 |
+| 5 | 0.0000 | 0.0000 | 1.0000 | 1.0000-1.0000 |
+| 6 | 0.0000 | 1.0000 | 0.0000 | 0.0000-0.0000 |
+| 8 | 0.0000 | 0.4914 | 0.5085 | 0.5045-0.5127 |
+| 12 | 0.0000 | 0.4922 | 0.5078 | 0.5028-0.5117 |
+| 16 | 0.0000 | 0.4904 | 0.5096 | 0.5060-0.5152 |
+
+### Independent bit-error-rate sweep (k=64)
+
+| BER | corrected_ok | detected_due | SDC total | SDC range |
+| --- | --- | --- | --- | --- |
+| 0.001 | 0.0659 | 0.0023 | 0.0000 | 0.0000-0.0001 |
+| 0.005 | 0.2494 | 0.0474 | 0.0041 | 0.0037-0.0046 |
+| 0.01 | 0.3500 | 0.1398 | 0.0227 | 0.0221-0.0242 |
+| 0.02 | 0.3422 | 0.3255 | 0.0982 | 0.0973-0.0990 |
+| 0.05 | 0.0943 | 0.5880 | 0.2928 | 0.2903-0.2957 |
+| 0.1 | 0.0042 | 0.6759 | 0.3194 | 0.3169-0.3222 |
+
+Full tables for k=64 and k=128 (9 burst widths, 6 BER points each) are in
+`ramulator_out/ecc_capability/summary.md` after running the script.
+
+### Findings
+
+1. Single-bit flips are always corrected, and random two-bit flips are always
+   caught as detected-uncorrectable — this is the textbook SECDED guarantee,
+   confirmed here as a sanity check before trusting the rest of the model.
+
+2. Contiguous burst widths of exactly 3 or 5 bits are the worst case: **100%
+   silent data corruption**, stable across all 5 repeats. The ECC doesn't just
+   fail to detect these clusters — it actively reports a successful correction
+   while leaving the data wrong. This is a property of where contiguous
+   positions collide in the Hamming syndrome, not a bug in one specific burst
+   width; widths 4, 8, 12, and 16 land closer to a 50/50 split between
+   detected-uncorrectable and silent corruption instead. See
+   [ecc-secded-burst-miscorrection.md](ecc-secded-burst-miscorrection.md) for
+   the worked-out mechanism (odd vs. even flip-count parity, and why "more
+   bits flipped" is not the same as "more dangerous").
+
+3. This directly matters for RowHammer: real hammering does not always
+   produce a clean single victim-row bit flip. If enough weak cells in the
+   same row/codeword neighborhood flip together, the failure mode is not "ECC
+   catches it" — it can be silent corruption of the kind this table quantifies.
+
+4. In the independent bit-error-rate sweep, the SDC rate rises from ~0% at
+   BER 0.001 to ~32% at BER 0.1 for k=64, meaning the ECC's practical safety
+   margin degrades well before every bit is flipped.
+
+5. This is still a software model of a generic SECDED code, not the vendor's
+   actual on-die ECC implementation (real codeword size, bit layout, and
+   algorithm are not publicly documented for DDR5). Treat it as a
+   demonstration of *why* clustered RowHammer-style errors are dangerous for
+   SECDED-class codes in general, not a measurement of a specific chip.
+
 ## Visual Explanation
 
 These three diagrams provide a simple visual story for a demo deck.
